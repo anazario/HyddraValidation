@@ -12,6 +12,8 @@ Usage:
 
 import argparse
 import sys
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='numpy')
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -316,6 +318,46 @@ def main():
             v1f, v2f = paired[flag]
             agree = np.sum(np.array(v1f, dtype=bool) == np.array(v2f, dtype=bool))
             print(f"\n{flag}: {agree}/{len(v1f)} pairs agree ({agree/len(v1f):.1%})")
+
+    # ── Difference diagnostics ───────────────────────────────────────────
+    print(f"\n── Where do the extra {ucounts['extra_new']} New-only vertices live? ──")
+    nsv_arr = np.array(nsv_pairs)
+    same_mask  = nsv_arr[:,0] == nsv_arr[:,1]
+    more_mask  = nsv_arr[:,1] >  nsv_arr[:,0]
+    fewer_mask = nsv_arr[:,1] <  nsv_arr[:,0]
+    print(f"  Events same nSV                    : {same_mask.sum()} ({same_mask.mean():.1%})")
+    print(f"  Events New has MORE   (New > Old)   : {more_mask.sum()} ({more_mask.mean():.1%}), "
+          f"avg extra = {(nsv_arr[more_mask,1]-nsv_arr[more_mask,0]).mean():.1f}")
+    print(f"  Events New has FEWER  (New < Old)   : {fewer_mask.sum()} ({fewer_mask.mean():.1%}), "
+          f"avg missing = {(nsv_arr[fewer_mask,0]-nsv_arr[fewer_mask,1]).mean():.1f}")
+
+    # dxy distribution of unmatched New-only vertices
+    unmatched_new_dxy = []
+    for key in common:
+        e1, e2 = ev1[key], ev2[key]
+        dxy1 = np.asarray(e1.get('HyddraSV_dxy', []), dtype=float)
+        dxy2 = np.asarray(e2.get('HyddraSV_dxy', []), dtype=float)
+        _, _, ub = match_vertices(dxy1, dxy2, args.dxy_match)
+        for ib in ub:
+            if ib < len(dxy2):
+                unmatched_new_dxy.append(float(dxy2[ib]))
+    if unmatched_new_dxy:
+        u = np.array(unmatched_new_dxy)
+        print(f"\n  New-only vertex dxy: "
+              f"mean={u.mean():.2f} cm  median={np.median(u):.2f} cm  "
+              f"max={u.max():.2f} cm  <1cm: {(u<1).mean():.1%}")
+
+    # Flag-flip breakdown on matched pairs
+    print(f"\n── Flag disagreements on {ucounts['matched']} matched pairs ──")
+    for flag in ['HyddraSV_passDisambiguation', 'HyddraSV_passIsolation']:
+        if flag not in paired or len(paired[flag][0]) == 0:
+            continue
+        f1 = np.asarray(paired[flag][0], dtype=bool)
+        f2 = np.asarray(paired[flag][1], dtype=bool)
+        flip_on  = np.sum(~f1 &  f2)   # Old=fail, New=pass
+        flip_off = np.sum( f1 & ~f2)   # Old=pass, New=fail
+        print(f"  {flag.replace('HyddraSV_',''):30s}: "
+              f"Old=pass→New=fail: {flip_off:4d}   Old=fail→New=pass: {flip_on:4d}")
 
     # ── Plots ─────────────────────────────────────────────────────────────
     print(f"\nWriting plots to {args.output} ...")
