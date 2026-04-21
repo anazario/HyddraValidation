@@ -22,9 +22,25 @@ options.register('outputCollection',
                  VarParsing.VarParsing.multiplicity.singleton,
                  VarParsing.VarParsing.varType.string,
                  "Base collection: seeds, inclusive, or isolated")
+options.register('trackCollection',
+                 'muonTracks',
+                 VarParsing.VarParsing.multiplicity.singleton,
+                 VarParsing.VarParsing.varType.string,
+                 "Track collection: muonTracks, muonGlobalTracks, or gedElectronTracks")
 options.setDefault('maxEvents', -1)
 options.setDefault('outputFile', 'hyddra_validation.root')
 options.parseArguments()
+
+# Map parallelRun.sh --track-collection names to HyddraLeptonTrackProducer config
+_COLLECTION_MAP = {
+    'muonTracks':       ('muon',     'slimmedMuons'),
+    'muonGlobalTracks': ('muon',     'slimmedMuons'),
+    'gedElectronTracks':('electron', 'slimmedElectrons'),
+}
+if options.trackCollection not in _COLLECTION_MAP:
+    raise RuntimeError("Unknown trackCollection '%s'. Valid: %s"
+                       % (options.trackCollection, list(_COLLECTION_MAP)))
+_leptonType, _src = _COLLECTION_MAP[options.trackCollection]
 
 process = cms.Process("HYDDRAVAL")
 
@@ -46,8 +62,11 @@ process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase1_2022_realistic', '
 process.TFileService = cms.Service("TFileService",
     fileName=cms.string(options.outputFile))
 
-# Producer
+# Track producer
 process.load("RecoVertex.HyddraSVProducer.hyddraEXO_cfi")
+
+process.hyddraLeptonTracks.leptonType = cms.string(_leptonType)
+process.hyddraLeptonTracks.src        = cms.InputTag(_src)
 process.hyddraSVsEXOProducer.leptonic.maxNormChi2 = cms.double(options.maxNormChi2)
 
 # Analyzer
@@ -60,7 +79,7 @@ process.hyddraVal = cms.EDAnalyzer("HyddraSVsEXOAnalyzer",
     seedIsolationFlags  = cms.InputTag("hyddraSVsEXOProducer", "seedIsolationFlags"),
     isolationFlags      = cms.InputTag("hyddraSVsEXOProducer", "isolationFlags"),
     pvCollection        = cms.InputTag("offlineSlimmedPrimaryVertices"),
-    tracks              = cms.InputTag("hyddraSVsEXOProducer", "leptonTracks"),
+    tracks              = cms.InputTag("hyddraLeptonTracks"),
     genParticles        = cms.InputTag("prunedGenParticles"),
     MET                 = cms.InputTag("slimmedMETs"),
     hasGenInfo          = cms.bool(options.hasGenInfo),
@@ -69,5 +88,5 @@ process.hyddraVal = cms.EDAnalyzer("HyddraSVsEXOAnalyzer",
     passSelDRCut        = cms.double(0.02),
 )
 
-process.p = cms.Path(process.hyddraSVsEXOProducer + process.hyddraVal)
+process.p = cms.Path(process.hyddraLeptonTracks + process.hyddraSVsEXOProducer + process.hyddraVal)
 process.schedule = cms.Schedule(process.p)
