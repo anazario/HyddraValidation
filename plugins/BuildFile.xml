@@ -9,6 +9,4 @@
 <use name="TrackingTools/TransientTrack"/>
 <use name="TrackingTools/Records"/>
 <use name="root"/>
-<lib name="FWCoreParameterSet"/>
-<lib name="FWCoreUtilities"/>
 <flags EDM_PLUGIN="1"/>
