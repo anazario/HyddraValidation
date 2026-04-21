@@ -61,10 +61,6 @@ def load_events(path, tree_path):
 
     optional = [b for b in SCALAR_BRANCHES + VECTOR_BRANCHES
                 if b not in required and b in avail]
-    missing = [b for b in SCALAR_BRANCHES + VECTOR_BRANCHES
-               if b not in required and b not in avail]
-    if missing:
-        print(f"  Branches not found (skipped): {missing}")
 
     want = required + optional
     arrays = t.arrays(filter_name=want, library="np")
@@ -83,41 +79,41 @@ def match_events(ev1, ev2):
     return common, only1, only2
 
 
-def match_vertices(sv_a, sv_b):
+def match_vertices(dxy_a, dxy_b, max_dxy_diff=0.5):
     """
-    Match vertices between two events by minimum 3D distance.
-    Returns list of (idx_a, idx_b) pairs and unmatched indices.
-    Uses dxy as primary sort key — stable match for identical algorithms.
+    Greedy nearest-neighbour match on dxy. Each old vertex is matched to the
+    closest unmatched new vertex (by |dxy_a - dxy_b|) within max_dxy_diff cm.
+    Vertices with no close partner are left unmatched.
     """
-    if len(sv_a) == 0 or len(sv_b) == 0:
-        return [], list(range(len(sv_a))), list(range(len(sv_b)))
+    if len(dxy_a) == 0 or len(dxy_b) == 0:
+        return [], list(range(len(dxy_a))), list(range(len(dxy_b)))
 
-    used_b = set()
-    pairs = []
+    used_b  = set()
+    pairs   = []
     unmatched_a = []
 
-    dxy_a = sv_a
-    dxy_b = sv_b
-
-    # Sort both by dxy descending; if algorithm is identical, order is the same
-    order_a = np.argsort(-dxy_a)
-    order_b = np.argsort(-dxy_b)
-
-    for rank, ia in enumerate(order_a):
-        ib = order_b[rank] if rank < len(order_b) else None
-        if ib is not None and ib not in used_b:
-            pairs.append((ia, ib))
-            used_b.add(ib)
+    for ia in np.argsort(-dxy_a):            # process old vertices large-dxy first
+        best_ib, best_d = None, max_dxy_diff
+        for ib in range(len(dxy_b)):
+            if ib in used_b:
+                continue
+            d = abs(float(dxy_a[ia]) - float(dxy_b[ib]))
+            if d < best_d:
+                best_d, best_ib = d, ib
+        if best_ib is not None:
+            pairs.append((ia, best_ib))
+            used_b.add(best_ib)
         else:
             unmatched_a.append(ia)
 
-    unmatched_b = [i for i in order_b if i not in {p[1] for p in pairs}]
+    unmatched_b = [i for i in range(len(dxy_b)) if i not in used_b]
     return pairs, unmatched_a, unmatched_b
 
 
-def collect_vertex_pairs(common_keys, ev1, ev2):
+def collect_vertex_pairs(common_keys, ev1, ev2, max_dxy_diff=0.5):
     """Collect paired vertex quantities across all matched events."""
-    fields = [b for b in VECTOR_BRANCHES if b in ev1[common_keys[0]]]
+    fields = [b for b in VECTOR_BRANCHES
+              if b in ev1[common_keys[0]] and b in ev2[common_keys[0]]]
     paired = {f: ([], []) for f in fields}
     unmatched_counts = {'extra_old': 0, 'extra_new': 0, 'matched': 0}
     nsv_pairs = []
@@ -132,7 +128,7 @@ def collect_vertex_pairs(common_keys, ev1, ev2):
         dxy1 = np.asarray(e1['HyddraSV_dxy'], dtype=float) if 'HyddraSV_dxy' in e1 else np.array([])
         dxy2 = np.asarray(e2['HyddraSV_dxy'], dtype=float) if 'HyddraSV_dxy' in e2 else np.array([])
 
-        pairs, ua, ub = match_vertices(dxy1, dxy2)
+        pairs, ua, ub = match_vertices(dxy1, dxy2, max_dxy_diff)
         unmatched_counts['matched'] += len(pairs)
         unmatched_counts['extra_old'] += len(ua)
         unmatched_counts['extra_new'] += len(ub)
@@ -237,6 +233,8 @@ def main():
     parser.add_argument('-l', '--labels', nargs=2, default=['Old', 'New'], metavar=('LABEL1', 'LABEL2'))
     parser.add_argument('-o', '--output', default='comparison.pdf')
     parser.add_argument('--tree', default=TREE_PATH, help=f'TTree path (default: {TREE_PATH})')
+    parser.add_argument('--dxy-match', type=float, default=0.5,
+                        metavar='CM', help='Max |dxy_old - dxy_new| for vertex matching in cm (default: 0.5)')
     args = parser.parse_args()
 
     label1, label2 = args.labels
@@ -249,6 +247,13 @@ def main():
     ev2 = load_events(args.file2, args.tree)
     print(f"  {len(ev2)} events")
 
+    branches1 = set(next(iter(ev1.values())).keys())
+    branches2 = set(next(iter(ev2.values())).keys())
+    only_in_1 = branches1 - branches2 - {'run','lumi','event'}
+    only_in_2 = branches2 - branches1 - {'run','lumi','event'}
+    if only_in_1: print(f"  Branches only in {label1}: {sorted(only_in_1)}")
+    if only_in_2: print(f"  Branches only in {label2}: {sorted(only_in_2)}")
+
     common, only1, only2 = match_events(ev1, ev2)
     print(f"\nEvent matching:")
     print(f"  Common events : {len(common)}")
@@ -258,7 +263,7 @@ def main():
     if not common:
         sys.exit("No common events — check that both files ran on the same input.")
 
-    paired, nsv_pairs, ucounts = collect_vertex_pairs(common, ev1, ev2)
+    paired, nsv_pairs, ucounts = collect_vertex_pairs(common, ev1, ev2, args.dxy_match)
 
     total_vtx = ucounts['matched'] + ucounts['extra_old'] + ucounts['extra_new']
     print(f"\nVertex matching (across {len(common)} common events):")
