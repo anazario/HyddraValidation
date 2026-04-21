@@ -40,8 +40,10 @@ VECTOR_BRANCHES = [
 def load_events(path, tree_path):
     f = uproot.open(path)
 
-    # Auto-detect tree if needed
-    if tree_path not in f:
+    # Auto-detect tree if needed — strip ROOT cycle suffix for lookup
+    def _strip(k): return k.split(';')[0]
+    keys_stripped = {_strip(k): k for k in f.keys()}
+    if tree_path not in keys_stripped:
         candidates = [k for k in f.keys() if 'Events' in k or 'tree' in k.lower()]
         if not candidates:
             print(f"  Available keys: {f.keys()}")
@@ -50,12 +52,21 @@ def load_events(path, tree_path):
         print(f"  Auto-detected tree: {tree_path}")
 
     t = f[tree_path]
-    avail = set(t.keys())
-    want = SCALAR_BRANCHES + [b for b in VECTOR_BRANCHES if b in avail]
-    missing = [b for b in VECTOR_BRANCHES if b not in avail]
-    if missing:
-        print(f"  WARNING: branches not found (skipped): {missing}")
+    avail = set(_strip(k) for k in t.keys())
 
+    required = ['run', 'lumi', 'event']
+    missing_req = [b for b in required if b not in avail]
+    if missing_req:
+        sys.exit(f"ERROR: required branches missing in {path}: {missing_req}")
+
+    optional = [b for b in SCALAR_BRANCHES + VECTOR_BRANCHES
+                if b not in required and b in avail]
+    missing = [b for b in SCALAR_BRANCHES + VECTOR_BRANCHES
+               if b not in required and b not in avail]
+    if missing:
+        print(f"  Branches not found (skipped): {missing}")
+
+    want = required + optional
     arrays = t.arrays(filter_name=want, library="np")
     n = len(arrays['run'])
     events = {}
@@ -113,7 +124,9 @@ def collect_vertex_pairs(common_keys, ev1, ev2):
 
     for key in common_keys:
         e1, e2 = ev1[key], ev2[key]
-        n1, n2 = int(e1['nHyddraSV']), int(e2['nHyddraSV'])
+        dxy_key = 'HyddraSV_dxy'
+        n1 = int(e1['nHyddraSV']) if 'nHyddraSV' in e1 else len(np.asarray(e1.get(dxy_key, [])))
+        n2 = int(e2['nHyddraSV']) if 'nHyddraSV' in e2 else len(np.asarray(e2.get(dxy_key, [])))
         nsv_pairs.append((n1, n2))
 
         dxy1 = np.asarray(e1['HyddraSV_dxy'], dtype=float) if 'HyddraSV_dxy' in e1 else np.array([])
@@ -256,13 +269,18 @@ def main():
     print(f"  Match fraction: {match_frac:.1%}")
 
     # ── nLeptonTracks comparison ──────────────────────────────────────────
-    ntk1 = np.array([ev1[k]['nLeptonTracks'] for k in common])
-    ntk2 = np.array([ev2[k]['nLeptonTracks'] for k in common])
-    ntk_agree = np.sum(ntk1 == ntk2)
-    print(f"\nnLeptonTracks agreement: {ntk_agree}/{len(common)} events ({ntk_agree/len(common):.1%})")
-    if ntk_agree < len(common):
-        diff = ntk2 - ntk1
-        print(f"  Mean difference (New-Old): {np.mean(diff):.2f}  Max: {np.max(np.abs(diff))}")
+    has_ntk = all('nLeptonTracks' in ev1[k] and 'nLeptonTracks' in ev2[k] for k in common)
+    if has_ntk:
+        ntk1 = np.array([ev1[k]['nLeptonTracks'] for k in common])
+        ntk2 = np.array([ev2[k]['nLeptonTracks'] for k in common])
+        ntk_agree = np.sum(ntk1 == ntk2)
+        print(f"\nnLeptonTracks agreement: {ntk_agree}/{len(common)} events ({ntk_agree/len(common):.1%})")
+        if ntk_agree < len(common):
+            diff = ntk2 - ntk1
+            print(f"  Mean difference (New-Old): {np.mean(diff):.2f}  Max: {np.max(np.abs(diff))}")
+    else:
+        ntk1 = ntk2 = np.array([])
+        print("\nnLeptonTracks: not present in one or both files, skipping")
 
     # ── nHyddraSV comparison ──────────────────────────────────────────────
     nsv_agree = np.sum(nsv_pairs[:, 0] == nsv_pairs[:, 1])
@@ -314,12 +332,15 @@ def main():
         axes[0, 1].legend(); axes[0, 1].set_yscale('log')
 
         # nLeptonTracks
-        vmax_tk = max(int(ntk1.max()), int(ntk2.max())) + 1 if len(ntk1) else 5
-        bins_tk = np.arange(-0.5, vmax_tk + 1.5)
-        axes[1, 0].hist(ntk1, bins=bins_tk, alpha=0.6, label=label1, color='steelblue')
-        axes[1, 0].hist(ntk2, bins=bins_tk, alpha=0.6, label=label2, color='tomato')
-        axes[1, 0].set_xlabel('nLeptonTracks'); axes[1, 0].set_ylabel('Events')
-        axes[1, 0].legend()
+        if len(ntk1) > 0:
+            vmax_tk = max(int(ntk1.max()), int(ntk2.max())) + 1
+            bins_tk = np.arange(-0.5, vmax_tk + 1.5)
+            axes[1, 0].hist(ntk1, bins=bins_tk, alpha=0.6, label=label1, color='steelblue')
+            axes[1, 0].hist(ntk2, bins=bins_tk, alpha=0.6, label=label2, color='tomato')
+            axes[1, 0].set_xlabel('nLeptonTracks'); axes[1, 0].set_ylabel('Events')
+            axes[1, 0].legend()
+        else:
+            axes[1, 0].set_visible(False)
 
         # nSV difference
         diff_nsv = nsv_pairs[:, 1] - nsv_pairs[:, 0]
