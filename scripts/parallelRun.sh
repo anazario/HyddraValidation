@@ -23,6 +23,9 @@ CONFIG="testHyddraSVAnalyzer_cfg.py"
 OUTPUT_DIR="parallel_output"
 OUTPUT_NAME="merged_ntuple.root"
 EXTRA_ARGS=""
+FITTER_MODE=""
+USE_SMOOTHING=""
+USE_MUON_SYSTEM_BOUNDS=""
 
 # Colors for output
 RED='\033[0;31m'
@@ -83,6 +86,9 @@ print_usage() {
     echo "  --track-collection X  Track collection option to pass to config"
     echo "  --mother-pdg-id X     PDG ID of the signal mother particle (e.g. 1000023 for iDM)"
     echo "  --hyddra-preset X     HYDDRA leptonic preset: default, NonIso, TightIso"
+    echo "  --fitter-mode MODE    Vertex fitter mode: legacy/default (False,False) or smoothed/v1 (True,True)"
+    echo "  --use-smoothing BOOL  Override Kalman vertex smoothing option: True or False"
+    echo "  --use-muon-bounds BOOL Override Kalman muon-system bounds option: True or False"
     echo "  --process-mode MODE   SV type: both (default), leptonic, or hadronic"
     echo "  --collection X        Vertex collection (e.g. PatMuonVertex, PatDSAMuonVertex)"
     echo "  --no-gen              Disable gen info (for data)"
@@ -99,6 +105,8 @@ print_usage() {
     echo "  $0 files.txt"
     echo "  $0 files.txt -j 4 -o results"
     echo "  $0 files.txt --track-collection general --no-gen"
+    echo "  $0 files.txt -o legacy_fit --fitter-mode legacy"
+    echo "  $0 files.txt -o smoothed_fit --fitter-mode smoothed"
     echo "  $0 files.txt -c testTrackAnalyzer_miniAOD_cfg.py --apply-cuts --min-pt 2.0"
 }
 
@@ -167,6 +175,18 @@ while [[ $# -gt 0 ]]; do
             EXTRA_ARGS="$EXTRA_ARGS hyddraPreset=$2"
             shift 2
             ;;
+        --fitter-mode)
+            FITTER_MODE="$2"
+            shift 2
+            ;;
+        --use-smoothing)
+            USE_SMOOTHING="$2"
+            shift 2
+            ;;
+        --use-muon-bounds|--use-muon-system-bounds)
+            USE_MUON_SYSTEM_BOUNDS="$2"
+            shift 2
+            ;;
         --collection)
             EXTRA_ARGS="$EXTRA_ARGS collection=$2"
             shift 2
@@ -214,6 +234,30 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+case "$FITTER_MODE" in
+    "" )
+        ;;
+    legacy|old|default )
+        USE_SMOOTHING="${USE_SMOOTHING:-False}"
+        USE_MUON_SYSTEM_BOUNDS="${USE_MUON_SYSTEM_BOUNDS:-False}"
+        ;;
+    smoothed|v1|new )
+        USE_SMOOTHING="${USE_SMOOTHING:-True}"
+        USE_MUON_SYSTEM_BOUNDS="${USE_MUON_SYSTEM_BOUNDS:-True}"
+        ;;
+    * )
+        echo -e "${RED}Error: Unknown fitter mode '$FITTER_MODE'. Use legacy/default or smoothed/v1.${NC}"
+        exit 1
+        ;;
+esac
+
+if [[ -n "$USE_SMOOTHING" ]]; then
+    EXTRA_ARGS="$EXTRA_ARGS useSmoothing=$USE_SMOOTHING"
+fi
+if [[ -n "$USE_MUON_SYSTEM_BOUNDS" ]]; then
+    EXTRA_ARGS="$EXTRA_ARGS useMuonSystemBounds=$USE_MUON_SYSTEM_BOUNDS"
+fi
 
 # Validate inputs
 if [[ ! -f "$INPUT_LIST" ]]; then
@@ -283,6 +327,9 @@ echo "  Files per job:   $FILES_PER_JOB"
 echo "  Parallel jobs:   $N_JOBS"
 echo "  Config file:     $CONFIG"
 echo "  Output dir:      $OUTPUT_DIR"
+if [[ -n "$FITTER_MODE" ]]; then
+echo "  Fitter mode:     $FITTER_MODE"
+fi
 echo "  Extra args:      $EXTRA_ARGS"
 echo ""
 
