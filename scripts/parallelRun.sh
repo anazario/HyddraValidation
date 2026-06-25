@@ -83,7 +83,7 @@ print_usage() {
     echo "  -o, --output-dir DIR  Output directory (default: parallel_output)"
     echo "  -n, --output-name     Merged output filename (default: merged_ntuple.root)"
     echo "  --continue            Skip files that completed successfully in a previous run"
-    echo "  --track-collection X  Track collection option to pass to config"
+    echo "  --track-collection X  Track collection option to pass to config (use gsfElectronTracks for true GsfTrackRef validation)"
     echo "  --mother-pdg-id X     PDG ID of the signal mother particle (e.g. 1000023 for iDM)"
     echo "  --hyddra-preset X     HYDDRA leptonic preset: default, NonIso, TightIso"
     echo "  --apply-seed-chi2-cut Apply maxNormChi2 to seed vertices"

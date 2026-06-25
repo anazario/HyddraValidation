@@ -51,7 +51,7 @@ options.register('trackCollection',
                  'muonTracks',
                  VarParsing.VarParsing.multiplicity.singleton,
                  VarParsing.VarParsing.varType.string,
-                 "Track collection: muonTracks, muonGlobalTracks, or gedElectronTracks")
+                 "Track collection: muonTracks, muonGlobalTracks, gedElectronTracks, or gsfElectronTracks")
 options.setDefault('maxEvents', -1)
 options.setDefault('outputFile', 'hyddra_validation.root')
 options.parseArguments()
@@ -61,6 +61,7 @@ _COLLECTION_MAP = {
     'muonTracks':       ('muon',     'slimmedMuons'),
     'muonGlobalTracks': ('muon',     'slimmedMuons'),
     'gedElectronTracks':('electron', 'slimmedElectrons'),
+    'gsfElectronTracks':('gsfElectron', 'slimmedElectrons'),
 }
 if options.trackCollection not in _COLLECTION_MAP:
     raise RuntimeError("Unknown trackCollection '%s'. Valid: %s"
@@ -90,8 +91,6 @@ process.TFileService = cms.Service("TFileService",
 # Track producer
 process.load("RecoVertex.HyddraSVProducer.hyddraEXO_cfi")
 
-process.hyddraLeptonTracks.leptonType = cms.string(_leptonType)
-process.hyddraLeptonTracks.src        = cms.InputTag(_src)
 process.hyddraSVsEXOProducer.leptonic.applySeedChi2Cut = cms.bool(options.applySeedChi2Cut)
 process.hyddraSVsEXOProducer.leptonic.maxNormChi2 = cms.double(options.maxNormChi2)
 process.hyddraSVsEXOProducer.leptonic.applyDcaCut = cms.bool(options.applyDcaCut)
@@ -99,17 +98,31 @@ process.hyddraSVsEXOProducer.leptonic.maxDca = cms.double(options.maxDca)
 process.hyddraSVsEXOProducer.leptonic.useSmoothing = cms.bool(options.useSmoothing)
 process.hyddraSVsEXOProducer.leptonic.useMuonSystemBounds = cms.bool(options.useMuonSystemBounds)
 
+if _leptonType == 'gsfElectron':
+    process.hyddraGsfElectronSVProducer = cms.EDProducer("HyddraGsfElectronSVProducer",
+        electrons    = cms.InputTag(_src),
+        pvCollection = cms.InputTag("offlineSlimmedPrimaryVertices"),
+        leptonic     = process.hyddraSVsEXOProducer.leptonic.clone(),
+    )
+    _producer = "hyddraGsfElectronSVProducer"
+    _tracks = cms.InputTag("hyddraGsfElectronSVProducer", "leptonTracks")
+else:
+    process.hyddraLeptonTracks.leptonType = cms.string(_leptonType)
+    process.hyddraLeptonTracks.src        = cms.InputTag(_src)
+    _producer = "hyddraSVsEXOProducer"
+    _tracks = cms.InputTag("hyddraLeptonTracks")
+
 # Analyzer
 process.hyddraVal = cms.EDAnalyzer("HyddraSVsEXOAnalyzer",
     outputCollection    = cms.string(options.outputCollection),
-    seedVertices        = cms.InputTag("hyddraSVsEXOProducer", "seedVertices"),
-    inclusiveVertices   = cms.InputTag("hyddraSVsEXOProducer", "inclusiveVertices"),
-    isolatedVertices    = cms.InputTag("hyddraSVsEXOProducer", "isolatedVertices"),
-    disambiguationFlags = cms.InputTag("hyddraSVsEXOProducer", "disambiguationFlags"),
-    seedIsolationFlags  = cms.InputTag("hyddraSVsEXOProducer", "seedIsolationFlags"),
-    isolationFlags      = cms.InputTag("hyddraSVsEXOProducer", "isolationFlags"),
+    seedVertices        = cms.InputTag(_producer, "seedVertices"),
+    inclusiveVertices   = cms.InputTag(_producer, "inclusiveVertices"),
+    isolatedVertices    = cms.InputTag(_producer, "isolatedVertices"),
+    disambiguationFlags = cms.InputTag(_producer, "disambiguationFlags"),
+    seedIsolationFlags  = cms.InputTag(_producer, "seedIsolationFlags"),
+    isolationFlags      = cms.InputTag(_producer, "isolationFlags"),
     pvCollection        = cms.InputTag("offlineSlimmedPrimaryVertices"),
-    tracks              = cms.InputTag("hyddraLeptonTracks"),
+    tracks              = _tracks,
     genParticles        = cms.InputTag("prunedGenParticles"),
     MET                 = cms.InputTag("slimmedMETs"),
     hasGenInfo          = cms.bool(options.hasGenInfo),
@@ -118,5 +131,8 @@ process.hyddraVal = cms.EDAnalyzer("HyddraSVsEXOAnalyzer",
     passSelDRCut        = cms.double(0.02),
 )
 
-process.p = cms.Path(process.hyddraLeptonTracks + process.hyddraSVsEXOProducer + process.hyddraVal)
+if _leptonType == 'gsfElectron':
+    process.p = cms.Path(process.hyddraGsfElectronSVProducer + process.hyddraVal)
+else:
+    process.p = cms.Path(process.hyddraLeptonTracks + process.hyddraSVsEXOProducer + process.hyddraVal)
 process.schedule = cms.Schedule(process.p)

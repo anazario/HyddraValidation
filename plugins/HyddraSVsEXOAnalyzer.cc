@@ -475,12 +475,12 @@ void HyddraSVsEXOAnalyzer::analyze(const edm::Event& iEvent,
 
   int svIdx = 0;
   for (const auto& sv : *svColl) {
-    std::vector<reco::TrackRef> trkRefs;
+    std::vector<reco::TrackBaseRef> trkRefs;
     for (auto it = sv.tracks_begin(); it != sv.tracks_end(); ++it)
-      trkRefs.push_back(it->castTo<reco::TrackRef>());
+      trkRefs.push_back(*it);
     if (trkRefs.size() != 2) { ++svIdx; continue; }
     std::sort(trkRefs.begin(), trkRefs.end(),
-              [](const reco::TrackRef& a, const reco::TrackRef& b){ return a->pt() > b->pt(); });
+              [](const reco::TrackBaseRef& a, const reco::TrackBaseRef& b){ return a->pt() > b->pt(); });
     const reco::Track& t1 = *trkRefs[0];
     const reco::Track& t2 = *trkRefs[1];
 
