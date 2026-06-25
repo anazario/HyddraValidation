@@ -86,6 +86,9 @@ print_usage() {
     echo "  --track-collection X  Track collection option to pass to config"
     echo "  --mother-pdg-id X     PDG ID of the signal mother particle (e.g. 1000023 for iDM)"
     echo "  --hyddra-preset X     HYDDRA leptonic preset: default, NonIso, TightIso"
+    echo "  --apply-seed-chi2-cut Apply maxNormChi2 to seed vertices"
+    echo "  --no-seed-chi2-cut    Disable the seed chi2 cut"
+    echo "  --max-norm-chi2 VALUE Maximum seed vertex chi2/ndof when enabled (default: 5.0)"
     echo "  --fitter-mode MODE    Vertex fitter mode: legacy/default (False,False) or smoothed/v1 (True,True)"
     echo "  --use-smoothing BOOL  Override Kalman vertex smoothing option: True or False"
     echo "  --use-muon-bounds BOOL Override Kalman muon-system bounds option: True or False"
@@ -110,7 +113,7 @@ print_usage() {
     echo "  $0 files.txt --track-collection general --no-gen"
     echo "  $0 files.txt -o legacy_fit --fitter-mode legacy"
     echo "  $0 files.txt -o smoothed_fit --fitter-mode smoothed"
-    echo "  $0 files.txt -o v1_like --fitter-mode smoothed --apply-dca-cut --max-dca 15"
+    echo "  $0 files.txt -o v1_like --fitter-mode smoothed --apply-dca-cut --max-dca 15 --no-seed-chi2-cut"
     echo "  $0 files.txt -c testTrackAnalyzer_miniAOD_cfg.py --apply-cuts --min-pt 2.0"
 }
 
@@ -174,6 +177,14 @@ while [[ $# -gt 0 ]]; do
         --max-norm-chi2)
             EXTRA_ARGS="$EXTRA_ARGS maxNormChi2=$2"
             shift 2
+            ;;
+        --apply-seed-chi2-cut)
+            EXTRA_ARGS="$EXTRA_ARGS applySeedChi2Cut=True"
+            shift
+            ;;
+        --no-seed-chi2-cut)
+            EXTRA_ARGS="$EXTRA_ARGS applySeedChi2Cut=False"
+            shift
             ;;
         --hyddra-preset)
             EXTRA_ARGS="$EXTRA_ARGS hyddraPreset=$2"

@@ -12,6 +12,11 @@ options.register('motherPdgId',
                  VarParsing.VarParsing.multiplicity.singleton,
                  VarParsing.VarParsing.varType.int,
                  "PDG ID of the signal mother particle for gen matching")
+options.register('applySeedChi2Cut',
+                 False,
+                 VarParsing.VarParsing.multiplicity.singleton,
+                 VarParsing.VarParsing.varType.bool,
+                 "Apply maxNormChi2 to seed vertices")
 options.register('maxNormChi2',
                  5.0,
                  VarParsing.VarParsing.multiplicity.singleton,
@@ -87,6 +92,7 @@ process.load("RecoVertex.HyddraSVProducer.hyddraEXO_cfi")
 
 process.hyddraLeptonTracks.leptonType = cms.string(_leptonType)
 process.hyddraLeptonTracks.src        = cms.InputTag(_src)
+process.hyddraSVsEXOProducer.leptonic.applySeedChi2Cut = cms.bool(options.applySeedChi2Cut)
 process.hyddraSVsEXOProducer.leptonic.maxNormChi2 = cms.double(options.maxNormChi2)
 process.hyddraSVsEXOProducer.leptonic.applyDcaCut = cms.bool(options.applyDcaCut)
 process.hyddraSVsEXOProducer.leptonic.maxDca = cms.double(options.maxDca)
