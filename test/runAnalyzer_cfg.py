@@ -17,6 +17,16 @@ options.register('maxNormChi2',
                  VarParsing.VarParsing.multiplicity.singleton,
                  VarParsing.VarParsing.varType.float,
                  "Max vertex chi2/ndof")
+options.register('applyDcaCut',
+                 False,
+                 VarParsing.VarParsing.multiplicity.singleton,
+                 VarParsing.VarParsing.varType.bool,
+                 "Reject seeds with successful DCA calculation above maxDca")
+options.register('maxDca',
+                 15.0,
+                 VarParsing.VarParsing.multiplicity.singleton,
+                 VarParsing.VarParsing.varType.float,
+                 "Maximum two-track DCA in cm when applyDcaCut is true")
 options.register('useSmoothing',
                  True,
                  VarParsing.VarParsing.multiplicity.singleton,
@@ -78,6 +88,8 @@ process.load("RecoVertex.HyddraSVProducer.hyddraEXO_cfi")
 process.hyddraLeptonTracks.leptonType = cms.string(_leptonType)
 process.hyddraLeptonTracks.src        = cms.InputTag(_src)
 process.hyddraSVsEXOProducer.leptonic.maxNormChi2 = cms.double(options.maxNormChi2)
+process.hyddraSVsEXOProducer.leptonic.applyDcaCut = cms.bool(options.applyDcaCut)
+process.hyddraSVsEXOProducer.leptonic.maxDca = cms.double(options.maxDca)
 process.hyddraSVsEXOProducer.leptonic.useSmoothing = cms.bool(options.useSmoothing)
 process.hyddraSVsEXOProducer.leptonic.useMuonSystemBounds = cms.bool(options.useMuonSystemBounds)
 

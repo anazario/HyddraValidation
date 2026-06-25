@@ -89,6 +89,9 @@ print_usage() {
     echo "  --fitter-mode MODE    Vertex fitter mode: legacy/default (False,False) or smoothed/v1 (True,True)"
     echo "  --use-smoothing BOOL  Override Kalman vertex smoothing option: True or False"
     echo "  --use-muon-bounds BOOL Override Kalman muon-system bounds option: True or False"
+    echo "  --apply-dca-cut       Reject seeds with successful DCA calculation above maxDca"
+    echo "  --no-dca-cut          Disable the seed DCA cut"
+    echo "  --max-dca VALUE       Maximum two-track DCA in cm when DCA cut is enabled (default: 15.0)"
     echo "  --process-mode MODE   SV type: both (default), leptonic, or hadronic"
     echo "  --collection X        Vertex collection (e.g. PatMuonVertex, PatDSAMuonVertex)"
     echo "  --no-gen              Disable gen info (for data)"
@@ -107,6 +110,7 @@ print_usage() {
     echo "  $0 files.txt --track-collection general --no-gen"
     echo "  $0 files.txt -o legacy_fit --fitter-mode legacy"
     echo "  $0 files.txt -o smoothed_fit --fitter-mode smoothed"
+    echo "  $0 files.txt -o v1_like --fitter-mode smoothed --apply-dca-cut --max-dca 15"
     echo "  $0 files.txt -c testTrackAnalyzer_miniAOD_cfg.py --apply-cuts --min-pt 2.0"
 }
 
@@ -185,6 +189,18 @@ while [[ $# -gt 0 ]]; do
             ;;
         --use-muon-bounds|--use-muon-system-bounds)
             USE_MUON_SYSTEM_BOUNDS="$2"
+            shift 2
+            ;;
+        --apply-dca-cut)
+            EXTRA_ARGS="$EXTRA_ARGS applyDcaCut=True"
+            shift
+            ;;
+        --no-dca-cut)
+            EXTRA_ARGS="$EXTRA_ARGS applyDcaCut=False"
+            shift
+            ;;
+        --max-dca)
+            EXTRA_ARGS="$EXTRA_ARGS maxDca=$2"
             shift 2
             ;;
         --collection)
