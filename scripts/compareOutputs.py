@@ -326,22 +326,32 @@ def main():
     more_mask  = nsv_arr[:,1] >  nsv_arr[:,0]
     fewer_mask = nsv_arr[:,1] <  nsv_arr[:,0]
     print(f"  Events same nSV                    : {same_mask.sum()} ({same_mask.mean():.1%})")
+    avg_extra = f"{(nsv_arr[more_mask,1]-nsv_arr[more_mask,0]).mean():.1f}" if more_mask.any() else "n/a"
     print(f"  Events New has MORE   (New > Old)   : {more_mask.sum()} ({more_mask.mean():.1%}), "
-          f"avg extra = {(nsv_arr[more_mask,1]-nsv_arr[more_mask,0]).mean():.1f}")
+          f"avg extra = {avg_extra}")
     avg_missing = f"{(nsv_arr[fewer_mask,0]-nsv_arr[fewer_mask,1]).mean():.1f}" if fewer_mask.any() else "n/a"
     print(f"  Events New has FEWER  (New < Old)   : {fewer_mask.sum()} ({fewer_mask.mean():.1%}), "
           f"avg missing = {avg_missing}")
 
-    # dxy distribution of unmatched New-only vertices
+    # dxy distribution of unmatched vertices
+    unmatched_old_dxy = []
     unmatched_new_dxy = []
     for key in common:
         e1, e2 = ev1[key], ev2[key]
         dxy1 = np.asarray(e1.get('HyddraSV_dxy', []), dtype=float)
         dxy2 = np.asarray(e2.get('HyddraSV_dxy', []), dtype=float)
-        _, _, ub = match_vertices(dxy1, dxy2, args.dxy_match)
+        _, ua, ub = match_vertices(dxy1, dxy2, args.dxy_match)
+        for ia in ua:
+            if ia < len(dxy1):
+                unmatched_old_dxy.append(float(dxy1[ia]))
         for ib in ub:
             if ib < len(dxy2):
                 unmatched_new_dxy.append(float(dxy2[ib]))
+    if unmatched_old_dxy:
+        u = np.array(unmatched_old_dxy)
+        print(f"\n  Old-only vertex dxy: "
+              f"mean={u.mean():.2f} cm  median={np.median(u):.2f} cm  "
+              f"max={u.max():.2f} cm  <1cm: {(u<1).mean():.1%}")
     if unmatched_new_dxy:
         u = np.array(unmatched_new_dxy)
         print(f"\n  New-only vertex dxy: "
