@@ -328,8 +328,9 @@ def main():
     print(f"  Events same nSV                    : {same_mask.sum()} ({same_mask.mean():.1%})")
     print(f"  Events New has MORE   (New > Old)   : {more_mask.sum()} ({more_mask.mean():.1%}), "
           f"avg extra = {(nsv_arr[more_mask,1]-nsv_arr[more_mask,0]).mean():.1f}")
+    avg_missing = f"{(nsv_arr[fewer_mask,0]-nsv_arr[fewer_mask,1]).mean():.1f}" if fewer_mask.any() else "n/a"
     print(f"  Events New has FEWER  (New < Old)   : {fewer_mask.sum()} ({fewer_mask.mean():.1%}), "
-          f"avg missing = {(nsv_arr[fewer_mask,0]-nsv_arr[fewer_mask,1]).mean():.1f}")
+          f"avg missing = {avg_missing}")
 
     # dxy distribution of unmatched New-only vertices
     unmatched_new_dxy = []

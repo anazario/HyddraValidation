@@ -17,6 +17,16 @@ options.register('maxNormChi2',
                  VarParsing.VarParsing.multiplicity.singleton,
                  VarParsing.VarParsing.varType.float,
                  "Max vertex chi2/ndof")
+options.register('useSmoothing',
+                 True,
+                 VarParsing.VarParsing.multiplicity.singleton,
+                 VarParsing.VarParsing.varType.bool,
+                 "Use Kalman vertex smoothing/refitted tracks")
+options.register('useMuonSystemBounds',
+                 True,
+                 VarParsing.VarParsing.multiplicity.singleton,
+                 VarParsing.VarParsing.varType.bool,
+                 "Extend Kalman vertex fitter bounds to the muon system")
 options.register('outputCollection',
                  'seeds',
                  VarParsing.VarParsing.multiplicity.singleton,
@@ -68,6 +78,8 @@ process.load("RecoVertex.HyddraSVProducer.hyddraEXO_cfi")
 process.hyddraLeptonTracks.leptonType = cms.string(_leptonType)
 process.hyddraLeptonTracks.src        = cms.InputTag(_src)
 process.hyddraSVsEXOProducer.leptonic.maxNormChi2 = cms.double(options.maxNormChi2)
+process.hyddraSVsEXOProducer.leptonic.useSmoothing = cms.bool(options.useSmoothing)
+process.hyddraSVsEXOProducer.leptonic.useMuonSystemBounds = cms.bool(options.useMuonSystemBounds)
 
 # Analyzer
 process.hyddraVal = cms.EDAnalyzer("HyddraSVsEXOAnalyzer",
